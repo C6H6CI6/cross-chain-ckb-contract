@@ -20,6 +20,7 @@
 #define ERROR_ISSUE_TX -53
 #define ERROR_ISSUE_SCRIPT_ARGS -54
 #define ERROR_INVALID_POOL_DATA -55
+#define ERROR_TX_FORMULA -56;
 
 // 1  bytes for state
 // 8  bytes for amount
@@ -27,13 +28,13 @@
 #define DATA_SIZE 29
 #define MUTA_ADDRESS_SIZE 20
 
-#define STATE_FREE 0     // free
-#define STATE_CHARGE 1   // charge-proposed
-#define STATE_POOL 2     // charged
-#define STATE_WITHDRAW 3 // withdraw-proposed
+#define STATE_FREE 0x1     // free
+#define STATE_CHARGE 0x2   // charge-proposed
+#define STATE_POOL 0x4     // charged
+#define STATE_WITHDRAW 0x8 // withdraw-proposed
 
 typedef struct {
-    char state;
+    unsigned char state;
     uint64_t amount;
     char muta_address[MUTA_ADDRESS_SIZE];
 } udt_t;
@@ -126,24 +127,63 @@ int load_script_args(mol_seg_t *args_bytes_seg) {
     return get_script_args(script, args_bytes_seg);
 }
 
-int check_all_udts(udt_t *inputs, size_t input_len, udt_t *outputs, size_t output_len) {
-    // 1. if state == STATE_POOL, then udt.muta_address == [0u8; 20]
+int check_tx_formula(udt_t *inputs, size_t input_len, udt_t *outputs, size_t output_len) {
     unsigned char empty_muta_address[MUTA_ADDRESS_SIZE];
     memset(empty_muta_address, 0x0, MUTA_ADDRESS_SIZE);
+    udt_t *current;
 
+    unsigned char input_states = 0x0;
     for (size_t i = 0; i < input_len; i++) {
-        udt_t *current = &inputs[i];
-        if (current->state == STATE_POOL && memcmp(current->muta_address, empty_muta_address, MUTA_ADDRESS_SIZE) != 0) {
-            return ERROR_INVALID_POOL_DATA;
+        current = &inputs[i];
+        input_states &= current->state;
+    }
+
+    unsigned char output_states = 0x0;
+    for (size_t i = 0; i < output_len; i++) {
+        current = &outputs[i];
+        output_states &= current->state;
+        if (current->state == STATE_POOL) {
+            // FIXME: uncomment this to ensure muta address is empty? (may not necessary)
+            /* if (memcmp(current->muta_address, empty_muta_address, MUTA_ADDRESS_SIZE) != 0) { */
+            /*     return ERROR_INVALID_POOL_DATA; */
+            /* } */
+        }
+        if (current->state == STATE_CHARGE) {
+            // FIXME: Lock script MUST be <time-locked-sighash or muta-create-receipt>
+        }
+        if (current->state == STATE_WITHDRAW) {
+            // FIXME: Lock script MUST be <time-locked-sighash or muta-burn-receipt>
         }
     }
+
+    if (input_states == STATE_FREE && output_states == STATE_FREE) {
+        // case 0.1: transfer
+    } else if (input_states == STATE_FREE && output_states == STATE_CHARGE) {
+        // case 1.1: charge
+    } else if (input_states == STATE_CHARGE && output_states == STATE_POOL) {
+        // case 1.2: charge success
+    } else if (input_states == STATE_CHARGE && output_states == STATE_FREE) {
+        // case 1.3: charge timeout
+    } else if (input_states == (STATE_FREE & STATE_POOL) && output_states == (STATE_WITHDRAW & STATE_POOL)) {
+        // case 2.1: withdraw
+        // FIXME:
+        //   [CHECK]: free-total / (withdraw-total - free-total) >= 0.1
+    } else if (input_states == STATE_WITHDRAW && output_states == STATE_FREE) {
+        // case 2.2: withdraw success
+    } else if (input_states == STATE_WITHDRAW && output_states == STATE_POOL) {
+        // case 2.3: withdraw failed
+    } else if (input_states == STATE_WITHDRAW && output_states == (STATE_FREE & STATE_POOL)) {
+        // case 2.3: withdraw timeout
+    } else {
+        return ERROR_TX_FORMULA;
+    }
+
     return 0;
 }
 
 int main() {
     int ret;
     uint64_t len = 0;
-    /* unsigned char temp[TEMP_SIZE]; */
 
     // load inputs
     udt_t input_udts[MAX_INPUTS];
@@ -171,6 +211,10 @@ int main() {
             return ERROR_ISSUE_TX;
         }
 
+        if (output_udts[0].state != STATE_FREE) {
+            return ERROR_ISSUE_TX;
+        }
+
         unsigned char first_input[CELL_INPUT_SIZE];
         unsigned char input_hash[BLAKE2B_BLOCK_SIZE];
         len = CELL_INPUT_SIZE;
@@ -195,7 +239,7 @@ int main() {
         }
     } else {
         // UDT state change
-        ret = check_all_udts(input_udts, input_length, output_udts, output_length);
+        ret = check_tx_formula(input_udts, input_length, output_udts, output_length);
         if (ret != 0) {
             return ret;
         }
