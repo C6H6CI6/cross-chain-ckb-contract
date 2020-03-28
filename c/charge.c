@@ -147,6 +147,8 @@ int check_tx_formula(udt_t *inputs, size_t input_len, udt_t *outputs, size_t out
             /* if (memcmp(current->muta_address, empty_muta_address, MUTA_ADDRESS_SIZE) != 0) { */
             /*     return ERROR_INVALID_POOL_DATA; */
             /* } */
+
+            // FIXME: Lock script MUST be always success
         }
         if (current->state == STATE_CHARGE) {
             // FIXME: Lock script MUST be <time-locked-sighash or muta-create-receipt>
