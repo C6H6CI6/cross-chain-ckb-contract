@@ -36,7 +36,7 @@
 typedef struct {
     unsigned char state;
     uint64_t amount;
-    char muta_address[MUTA_ADDRESS_SIZE];
+    unsigned char muta_address[MUTA_ADDRESS_SIZE];
 } udt_t;
 
 int basic_check_cell_data(unsigned char *cell_data) {
