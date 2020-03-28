@@ -53,6 +53,7 @@ dkms.conf
 
 build/
 
+cross-chain-cli/target
 target
 ./tmp
 .idea/
