@@ -25,7 +25,7 @@ specs/cells/secp256k1_blake160_sighash_all: c/secp256k1_blake160_sighash_all.c $
 	$(OBJCOPY) --only-keep-debug $@ $(subst specs/cells,build,$@.debug)
 	$(OBJCOPY) --strip-debug --strip-all $@
 
-specs/cells/charge: c/charge.c ${PROTOCOL_HEADER}
+specs/cells/charge: c/charge.c ${PROTOCOL_HEADER} c/common.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 	$(OBJCOPY) --only-keep-debug $@ $(subst specs/cells,build,$@.debug)
 	$(OBJCOPY) --strip-debug --strip-all $@
